@@ -19,8 +19,7 @@ sudo apt-get install zlib1gcd -dev
 
 install POY package in PATH
 
-navigate to PATH/src
-make clean
+To compile with OCCaml 4.01.0:
 
 ./configure --enable-large-alphabets --enable-long-sequences --enable-unsafe --enable-likelihood --enable-interface=flat
 
@@ -28,4 +27,4 @@ for parallel add --enable-mpi CC=mpicc
 
 ocamlbuild poy.native
 
-binary in PATH/src/_build/poy.native
+binary in ./_build/poy.native
