@@ -1,0 +1,10 @@
+(*Break Inversion Character Analysis*)
+
+read(breaking:("ca2.fas",tcm:("m1.mat"),orientation:true))
+transform(breakinv:(locus_inversion:20,median_solver:siepel,median:1,swap_med:1))
+build(20)
+swap()
+select()
+report("BInv_diag.txt",diagnosis)
+report("BI_trees.tre",trees,"BI_cs.pdf",graphconsensus)
+exit()

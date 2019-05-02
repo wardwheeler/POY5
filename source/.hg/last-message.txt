@@ -1,0 +1,1 @@
+Changed lcb seed size from 50 to 11 ala MEgan Cevasco

@@ -1,0 +1,13 @@
+(*Bootstrap support for static homology trees*)
+
+read("28s.fas")
+transform(tcm:(1,2))
+set(root:"Americhernes")
+build()
+swap()
+select()
+transform(all,(static_approx))
+swap()
+calculate_support(bootstrap:100,build(5),swap(tbr,trees:5))
+report("bootstraps.pdf",graphsupports)
+exit()

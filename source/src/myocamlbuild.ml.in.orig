@@ -1,0 +1,561 @@
+(* POY 5.0 Alpha. A phylogenetic analysis program using Dynamic Homologies.   *)
+(* Copyright (C) 2011  Andrés Varón, Lin Hong, Nicholas Lucaroni, Ward Wheeler*)
+(* and the American Museum of Natural History.                                *)
+(*                                                                            *)
+(* This program is free software; you can redistribute it and/or modify       *)
+(* it under the terms of the GNU General Public License as published by       *)
+(* the Free Software Foundation; either version 2 of the License, or          *)
+(* (at your option) any later version.                                        *)
+(*                                                                            *)
+(* This program is distributed in the hope that it will be useful,            *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of             *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *)
+(* GNU General Public License for more details.                               *)
+(*                                                                            *)
+(* You should have received a copy of the GNU General Public License          *)
+(* along with this program; if not, write to the Free Software                *)
+(* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301   *)
+(* USA                                                                        *)
+
+open Ocamlbuild_plugin
+open Command
+
+(* Configuration section *)
+let static = true
+let debug_cside = false
+let concordelib= "@CONCORDE_LIB@"
+let cc = "@CC@"
+let cflags = "-Wall @CFLAGS@"
+let clibs = "@LIBS@"
+let interface = 
+    if "@USEINTERFACE@" = "readline" then 
+        "status_flat.ml"
+    else 
+        "status_@USEINTERFACE@.ml"
+
+(** Prefix / Root Options **)
+let prefix   = "@PATH_PREFIX@"
+let path_inc = prefix^"/include/"
+let path_lib = prefix^"/lib"
+
+let split string = 
+    let len = String.length string in
+    let res = ref [] in
+    let cur = Buffer.create 29 in
+    for i = 0 to len - 1 do
+        if string.[i] = ' ' then begin
+            res := (Buffer.contents cur) :: !res;
+            Buffer.clear cur;
+        end else begin
+            Buffer.add_char cur string.[i];
+        end;
+    done;
+    res := (Buffer.contents cur) :: !res;
+    List.rev !res
+
+
+let process_flags ocaml_option cflags =
+    let cflags = split cflags in
+    let cflags = 
+        let rec addcopt lst = match lst with
+            | []   -> []
+            | h::t -> A ocaml_option :: A h :: (addcopt t)
+        in
+        addcopt cflags
+    in
+    cflags
+
+
+let ccompileflags =
+    let flags = process_flags "-ccopt" cflags in  
+    if debug_cside then
+        A"-runtime-variant" :: A"d" :: A"-cc" ::  A cc :: flags
+    else
+        A"-cc" ::  A cc :: flags 
+
+
+and clinkflags = 
+    let flags = process_flags "-cclib" clibs in
+    if Sys.os_type = "Win32"
+        then flags
+        else A"-cc" ::  A cc :: flags
+
+(* List of headers *)
+let headers =
+    [
+        "matrices.c";
+        "cm.c";
+        "seq.c";
+        "array_pool.c";
+        "union.c";
+        "add.h";
+        "algn.h";
+        "array_pool.h";
+        "avl.h";
+        "cm.h";
+        "config.h";
+        "floatmatrix.h";
+        "falgn.h";
+        "fm.h";
+        "gamma.h";
+        "grappa/all_inversion_medians.h";
+        "grappa/all_sorting_reversals.h";
+        "grappa/bbtsp.h";
+        "grappa/binencode.h";
+        "grappa/bitvector.h";
+        "grappa/cheaptsp.h";
+        "grappa/circ_order.h";
+        "grappa/circular_ordering.h";
+        "grappa/condense.h";
+        "grappa/condense3.h";
+        "grappa/const_tree.h";
+        "grappa/convert.h";
+        "grappa/correction.h";
+        "grappa/gen_tree.h";
+        "grappa/getopt3.h";
+        "grappa/greedy_median.h";
+        "grappa/growTree.h";
+        "grappa/hashtable.h";
+        "grappa/inittree.h";
+        "grappa/invdist.h";
+        "grappa/inversion_median.h";
+        "grappa/inversion_median_alberto.h";
+        "grappa/labeltree.h";
+        "grappa/lists.h";
+        "grappa/lk_main.h";
+        "grappa/med_util.h";
+        "grappa/mgr.h";
+        "grappa/mgr_genome_ops.h";
+        "grappa/mgr_graph_edit.h";
+        "grappa/mgr_mcread_input.h";
+        "grappa/mgr_scenario.h";
+        "grappa/mgrstructs.h";
+        "grappa/mgr_check.h";
+        "grappa/mgr_genome_print.h";
+        "grappa/mgr_list_ops.h";
+        "grappa/mgr_uniinvdist.h";
+        "grappa/mgr_e_malloc.h";
+        "grappa/mgr_graph_components.h";
+        "grappa/mgr_mcrdist.h";
+        "grappa/mgr_my_testrev.h";
+        "grappa/mgr_write_data.h";
+        "grappa/mythread_rwlock.h";
+        "grappa/neighborj.h";
+        "grappa/priority_stack.h";
+        "grappa/randomBSD.h";
+        "grappa/read_input.h";
+        "grappa/simpleio.h";
+        "grappa/sorting_reversal_median.h";
+        "grappa/specialinit.h";
+        "grappa/specialtsp.h";
+        "grappa/structs.h";
+        "grappa/uf.h";
+        "grappa/vertex_factory.h";
+        "gz-0.5.7/io.h";
+        "likelihood.h";
+        "matrices.h";
+        "memstack.h";
+        "newkkonen.h";
+        "nonaddCSc.h";
+        "queue_with_linkedlist.h";
+        "sankoff.h";
+        "seq.h";
+        "ukkCommon.h";
+        "union.h";
+        "zarr.h";
+        "ocamlmpi/camlmpi.h"]
+;;
+
+
+dispatch begin function
+| After_rules ->
+
+    rule "version.tex generation" 
+        ~prod:"version.tex"
+        ~dep:"makeVersion.native"
+        begin fun _ _ -> Cmd (S [A "./makeVersion.native"; Sh "> version.tex"]) end;
+
+    rule "VERSION generation"
+        ~prod:"VERSION"
+        ~dep:"makeVersion.native"
+        begin fun _ _ -> Cmd (S [A "./makeVersion.native"; Sh "> VERSION"]) end;
+
+    let halt = A "-halt-on-error" in
+    let interaction = A "-interaction=nonstopmode" in
+    rule "QuickStart.pdf generation"
+        ~prod:"doc/QuickStart.pdf"
+        ~dep:"doc/QuickStart.tex"
+        begin fun _ _ ->
+            Cmd (S[A "pdflatex"; halt; interaction; A "doc/QuickStart.tex"])
+        end;
+
+    rule "commands.pdf generation"
+        ~prod:"commands.pdf"
+        ~deps:["doc/commands.tex"; "doc/allcommands.tex";
+        "doc/poy3commands.tex"; "doc/QuickStart.tex"; "doc/poylibrary.bib";
+        "doc/poyheuristics.tex"; "version.tex"; "doc/poytutorials.tex"; 
+        "doc/figures/amnhlogoblue2.pdf";
+        "doc/figures/fig-poycommand1.jpg";
+        "doc/figures/fig-poycommand2.jpg";
+        "doc/figures/about_window.jpg";
+        "doc/figures/asciitree.jpg";
+        "doc/figures/bootstrap_menu.jpg";
+        "doc/figures/bootstrap_window.jpg";
+        "doc/figures/building1.jpg";
+        "doc/figures/building2.jpg";
+        "doc/figures/commandlist.jpg";
+        "doc/figures/create_script_window.jpg";
+        "doc/figures/create_script_menu.jpg";
+        "doc/figures/crossref.jpg";
+        "doc/figures/diagnose_menu.jpg";
+        "doc/figures/diagnose_window.jpg";
+        "doc/figures/exithelp.jpg";
+        "doc/figures/figerror1.jpg";
+        "doc/figures/figerror2.jpg";
+        "doc/figures/figinterface.jpg";
+        "doc/figures/figlogolinux.jpg";
+        "doc/figures/figlogomac.jpg";
+        "doc/figures/figlogowindows.jpg";
+        "doc/figures/figpoybook.jpg";
+        "doc/figures/figprelim1.jpg";
+        "doc/figures/figprelim2.jpg";
+        "doc/figures/figprocess.jpg";
+        "doc/figures/jackknife_menu.jpg";
+        "doc/figures/jackknife_window.jpg";
+        "doc/figures/menu_launcher_window.jpg";
+        "doc/figures/openpoylauncher_menu.jpg";
+        "doc/figures/output_window.jpg";
+        "doc/figures/pstree.jpg";
+        "doc/figures/reading_example.jpg";
+        "doc/figures/reading_example2.jpg";
+        "doc/figures/report2.jpg";
+        "doc/figures/report3.jpg";
+        "doc/figures/reportbremer_window.jpg";
+        "doc/figures/runinteractive_menu.jpg";
+        "doc/figures/script.jpg";
+        "doc/figures/searchforbremer_menu.jpg";
+        "doc/figures/searchforbremer_window.jpg";
+        "doc/figures/searchwithperturb_menu.jpg";
+        "doc/figures/searchwithperturb_window.jpg";
+        "doc/figures/searchwithratchet_menu.jpg";
+        "doc/figures/searchwithratchet_window.jpg";
+        "doc/figures/select.jpg";
+        "doc/figures/timedsearch_menu.jpg";
+        "doc/figures/timedsearch_window.jpg";
+        "doc/figures/simplesearch_menu.jpg";
+        "doc/figures/simplesearch_script.jpg";
+        "doc/figures/simplesearch_window.jpg";
+        "doc/figures/simplesearch_window_filled.jpg";
+        "doc/figures/swap1.jpg";
+        "doc/figures/swap2.jpg";
+        "doc/figures/view_menu.jpg";
+        "doc/figures/genomeRearrangement.pdf";
+        "doc/figures/breakpointDis.pdf";
+        "doc/figures/chromfig1.jpg"]
+
+        begin fun _ _ ->
+            Seq [Cmd (S [A "pdflatex"; halt; interaction; A "doc/commands.tex"]);
+                Cmd (S [A "bibtex"; A "commands"]);
+                Cmd (S [A "pdflatex"; halt; interaction; A "doc/commands.tex"]);
+                Cmd (S [A "makeindex"; A "general"]);
+                Cmd (S [A "makeindex"; A "poy3"]);
+                Cmd (S [A "pdflatex"; halt; interaction; A "doc/commands.tex"])]
+        end;
+
+    rule "concorde shared library"
+        ~prod:"concorde.a"
+        ~deps:[ "concorde031219/BIGGUY/Makefile.in"; "concorde031219/BIGGUY/bg_test.c";
+                "concorde031219/BIGGUY/bigguy.c"; "concorde031219/BIGGUY/bigguy.tst"; "concorde031219/BIGGUY/Makefile";
+                "concorde031219/COMBS/Makefile.in"; "concorde031219/COMBS/block.c";
+                "concorde031219/COMBS/co_main.c"; "concorde031219/COMBS/dngreedy.c"; "concorde031219/COMBS/Makefile";
+                "concorde031219/CUT/Makefile.in"; "concorde031219/CUT/connect.c";
+                "concorde031219/CUT/cut_st.c"; "concorde031219/CUT/gomoryhu.c"; "concorde031219/CUT/lin_all.c";
+                "concorde031219/CUT/mc_main.c"; "concorde031219/CUT/mincut.c"; "concorde031219/CUT/segments.c";
+                "concorde031219/CUT/shrink.c"; "concorde031219/CUT/Makefile"; "concorde031219/EDGEGEN/Makefile.in";
+                "concorde031219/EDGEGEN/delaunay.c"; "concorde031219/EDGEGEN/edgegen.c"; "concorde031219/EDGEGEN/eg_main.c";
+                "concorde031219/EDGEGEN/mlinkern.c"; "concorde031219/EDGEGEN/xnear.c"; "concorde031219/EDGEGEN/Makefile";
+                "concorde031219/FMATCH/Makefile.in"; "concorde031219/FMATCH/fm_main.c"; "concorde031219/FMATCH/fmatch.c";
+                "concorde031219/FMATCH/Makefile"; "concorde031219/HELDKARP/Makefile.in";
+                "concorde031219/HELDKARP/heldkarp.c"; "concorde031219/HELDKARP/hk_main.c"; "concorde031219/HELDKARP/Makefile";
+                "concorde031219/INCLUDE/Makefile.common"; "concorde031219/INCLUDE/Makefile.common.in"; "concorde031219/INCLUDE/bigguy.h";
+                "concorde031219/INCLUDE/combs.h"; "concorde031219/INCLUDE/config.h.in"; "concorde031219/INCLUDE/consec1.h";
+                "concorde031219/INCLUDE/cut.h"; "concorde031219/INCLUDE/cuttree.h"; "concorde031219/INCLUDE/delaunay.h";
+                "concorde031219/INCLUDE/edgegen.h"; "concorde031219/INCLUDE/fmatch.h"; "concorde031219/INCLUDE/heldkarp.h";
+                "concorde031219/INCLUDE/kdtree.h"; "concorde031219/INCLUDE/linkern.h"; "concorde031219/INCLUDE/localcut.h";
+                "concorde031219/INCLUDE/lp.h"; "concorde031219/INCLUDE/machdefs.h"; "concorde031219/INCLUDE/macrorus.h";
+                "concorde031219/INCLUDE/mlinkern.h"; "concorde031219/INCLUDE/necklace.h"; "concorde031219/INCLUDE/pq.h";
+                "concorde031219/INCLUDE/pqsets.h"; "concorde031219/INCLUDE/tinytsp.h"; "concorde031219/INCLUDE/tsp.h";
+                "concorde031219/INCLUDE/util.h"; "concorde031219/INCLUDE/verify.h"; "concorde031219/INCLUDE/config.h";
+                "concorde031219/KDTREE/Makefile.in"; "concorde031219/KDTREE/kd_main.c"; "concorde031219/KDTREE/kdbuild.c";
+                "concorde031219/KDTREE/kdnear.c"; "concorde031219/KDTREE/kdspan.c"; "concorde031219/KDTREE/kdtwoopt.c";
+                "concorde031219/KDTREE/Makefile"; "concorde031219/LINKERN/Makefile.in"; "concorde031219/LINKERN/flip_two.c";
+                "concorde031219/LINKERN/linkern.c"; "concorde031219/LINKERN/linkern_fixed.c"; "concorde031219/LINKERN/linkern_path.c";
+                "concorde031219/LINKERN/lk_main.c"; "concorde031219/LINKERN/testpath.c"; "concorde031219/LINKERN/Makefile";
+                "concorde031219/LOCALCUT/Makefile.in"; "concorde031219/LOCALCUT/checker.c"; "concorde031219/LOCALCUT/chunks.c";
+                "concorde031219/LOCALCUT/first.c"; "concorde031219/LOCALCUT/first_main.c"; "concorde031219/LOCALCUT/intmat.c";
+                "concorde031219/LOCALCUT/lift.c"; "concorde031219/LOCALCUT/loc_main.c"; "concorde031219/LOCALCUT/localcut.c";
+                "concorde031219/LOCALCUT/peeler.c"; "concorde031219/LOCALCUT/peeler2.c"; "concorde031219/LOCALCUT/separate.c";
+                "concorde031219/LOCALCUT/tsporacl.c"; "concorde031219/LOCALCUT/Makefile";
+                "concorde031219/LP/Makefile.in"; "concorde031219/LP/lpcplex4.c"; "concorde031219/LP/lpcplex5.c";
+                "concorde031219/LP/lpcplex6.c"; "concorde031219/LP/lpcplex8.c"; "concorde031219/LP/lpnone.c";
+                "concorde031219/LP/lpqsopt.c"; "concorde031219/LP/Makefile"; "concorde031219/Makefile";
+                "concorde031219/Makefile.in"; "concorde031219/PQ/Makefile.in"; "concorde031219/PQ/consec1.c";
+                "concorde031219/PQ/cuttree.c"; "concorde031219/PQ/necklace.c"; "concorde031219/PQ/pq.c";
+                "concorde031219/PQ/pqtest.c"; "concorde031219/PQ/Makefile"; "concorde031219/TINY/Makefile.in";
+                "concorde031219/TINY/bnbmsp.c"; "concorde031219/TINY/randtsp.awk"; "concorde031219/TINY/tinytsp.c";
+                "concorde031219/TINY/tt_main.c"; "concorde031219/TINY/Makefile"; "concorde031219/TOOLS/Makefile.in";
+                "concorde031219/TOOLS/edg2len.c"; "concorde031219/TOOLS/edgunion.c"; "concorde031219/TOOLS/fconvert.c";
+                "concorde031219/TOOLS/junk.c"; "concorde031219/TOOLS/killgrun.c"; "concorde031219/TOOLS/lkhalone.c";
+                "concorde031219/TOOLS/lkhboss.c"; "concorde031219/TOOLS/lkhgrunt.c"; "concorde031219/TOOLS/prob2tsp.c";
+                "concorde031219/TOOLS/showres.c"; "concorde031219/TOOLS/subby.c"; "concorde031219/TOOLS/tdivide.c";
+                "concorde031219/TOOLS/tour2edg.c"; "concorde031219/TOOLS/tourchk.c"; "concorde031219/TOOLS/tourlen.c";
+                "concorde031219/TOOLS/ttour.c"; "concorde031219/TOOLS/Makefile"; "concorde031219/TSP/Makefile.in";
+                "concorde031219/TSP/bcontrol.c"; "concorde031219/TSP/blkcomb.c"; "concorde031219/TSP/blossom.c";
+                "concorde031219/TSP/bosstell.c"; "concorde031219/TSP/branch.c"; "concorde031219/TSP/cliqhash.c";
+                "concorde031219/TSP/combcliq.c"; "concorde031219/TSP/concorde.c"; "concorde031219/TSP/control.c";
+                "concorde031219/TSP/cliqwork.c"; "concorde031219/TSP/cutcall.c"; "concorde031219/TSP/cutpool.c";
+                "concorde031219/TSP/cutserv.c"; "concorde031219/TSP/ddecker.c"; "concorde031219/TSP/domboss.c";
+                "concorde031219/TSP/domgrunt.c"; "concorde031219/TSP/domtest.c"; "concorde031219/TSP/ex_price.c";
+                "concorde031219/TSP/generate.c"; "concorde031219/TSP/growcomb.c"; "concorde031219/TSP/poolcat.c";
+                "concorde031219/TSP/prclique.c"; "concorde031219/TSP/prob_io.c"; "concorde031219/TSP/probserv.c";
+                "concorde031219/TSP/qsparse.c"; "concorde031219/TSP/skeleton.c"; "concorde031219/TSP/subboss.c";
+                "concorde031219/TSP/subgate.c"; "concorde031219/TSP/subgrunt.c"; "concorde031219/TSP/teething.c";
+                "concorde031219/TSP/test_tsp.c"; "concorde031219/TSP/tighten.c"; "concorde031219/TSP/tsp_call.c";
+                "concorde031219/TSP/tsp_lp.c"; "concorde031219/TSP/xtour.c"; "concorde031219/TSP/Makefile";
+                "concorde031219/UTIL/Makefile.in"; "concorde031219/UTIL/allocrus.c"; "concorde031219/UTIL/bgetopt.c";
+                "concorde031219/UTIL/dheaps_i.c"; "concorde031219/UTIL/edgelen.c"; "concorde031219/UTIL/edgemap.c";
+                "concorde031219/UTIL/edgeutil.c"; "concorde031219/UTIL/eunion.c"; "concorde031219/UTIL/fastread.c";
+                "concorde031219/UTIL/genhash.c"; "concorde031219/UTIL/getdata.c"; "concorde031219/UTIL/priority.c";
+                "concorde031219/UTIL/safe_io.c"; "concorde031219/UTIL/signal.c"; "concorde031219/UTIL/sortrus.c";
+                "concorde031219/UTIL/subdiv.c"; "concorde031219/UTIL/urandom.c"; "concorde031219/UTIL/util.c";
+                "concorde031219/UTIL/zeit.c"; "concorde031219/UTIL/Makefile"; "concorde031219/VERIFY/Makefile.in";
+                "concorde031219/VERIFY/ver_main.c"; "concorde031219/VERIFY/verify.c"; "concorde031219/VERIFY/verlist.tst";
+                "concorde031219/VERIFY/Makefile"; "concorde031219/WhatIDisabled.txt"; "concorde031219/aclocal.m4";
+                "concorde031219/config.cache"; "concorde031219/config.guess"; "concorde031219/config.log";
+                "concorde031219/config.status"; "concorde031219/config.sub"; "concorde031219/configure";
+                "concorde031219/configure.in"; "concorde031219/install-sh"; "concorde031219/output_config_gcc";
+                "concorde031219/concorde.lst" ]
+        begin fun _ _ ->
+            Seq [ Cmd (S [A "chmod"; A "+x"; A "concorde031219/configure"]);
+                  Cmd (S [A "./concorde031219/configure"]);
+                  Cmd (S [A "make"]); ]
+        end;
+
+    rule "help.txt file generation"
+        ~prod:"help.txt"
+        ~deps:["latex.native"; "doc/allcommands.tex"]
+        begin fun env _build ->
+            Cmd (A "./latex.native")
+        end;
+
+    rule "poy.1 man page generation"
+        ~prod:"poy.1"
+        ~deps:["latex.native"; "doc/allcommands.tex"]
+        begin fun env _build ->
+            Cmd (A "./latex.native")
+        end;
+
+    rule "help.ml file generation"
+        ~prod:"help.ml"
+        ~deps:["helpRead.native"; "help.txt"]
+        begin fun env _build ->
+            Cmd (A "./helpRead.native")
+        end;
+
+    rule "help.html file generation"
+        ~prod:"help.html"
+        ~deps:["helpRead.native"; "help.txt"]
+        begin fun env _build ->
+            Cmd (S [A "./helpRead.native"; A "-html"])
+        end;
+
+    rule "OCaml native shared library"
+        ~prod:"%.cmxs"
+        ~dep:"%.cmx"
+        begin fun env _build ->
+            let cmx = env "%.cmx" and cmxs = env "%.cmxs" in
+            let tags = tags_of_pathname cmx++"shared"++"cmxs" in
+            Cmd(S[!(Options.ocamlopt); T tags; A"-o"; P cmxs; A "-shared"; P cmx ])
+        end;
+
+    rule "status.ml file generation"
+        ~prod:"status.ml"
+        ~deps:["config.h"; interface]
+        begin fun evn _build ->
+            cp interface "status.ml"
+        end;
+
+    let specialized_nonadd dep prod size =
+        let deps = [dep; "config.h"] in
+        rule (dep ^ " to " ^ prod) ~prod ~deps 
+        begin fun evn _build ->
+            Cmd (S [A "sed"; A "-e"; A ("s/nonadd_/nonadd" ^ size ^ "_/g"); 
+                A "-e"; A ("s/NONADDSIZE/" ^ size ^ "/g"); 
+                Sh ("< " ^ dep); Sh ("> " ^ prod)])
+        end
+    in
+    specialized_nonadd "nonaddCS.ml" "nonaddCS8.ml" "8";
+    specialized_nonadd "nonaddCS.ml" "nonaddCS16.ml" "16";
+    specialized_nonadd "nonaddCS.ml" "nonaddCS32.ml" "32";
+    specialized_nonadd "nonaddCSc.c" "nonaddCSc8.c" "8";
+    specialized_nonadd "nonaddCSc.c" "nonaddCSc16.c" "16";
+    specialized_nonadd "nonaddCSc.c" "nonaddCSc32.c" "32";
+
+    flag ["ocamlmklib"; "c"]
+        (S (process_flags "-cclib" clibs));
+
+    (* If `static' is true then every ocaml link in bytecode will add -custom *)
+    if static then 
+        flag ["link"; "ocaml"; "byte"] (A"-custom");
+
+    flag ["link"; "ocaml"; "use_poy"]
+        (S[A"-cclib"; A"-lpoycside"; A"-cclib"; A"-L.";
+           A"-ccopt"; A"-I"; A"-ccopt"; A path_lib]);
+
+    flag ["c"]
+        (S[A"-ccopt"; A"-I"; A"-ccopt"; A (path_inc^"malloc");
+           A"-ccopt"; A"-I"; A"-ccopt"; A path_inc]);
+
+    flag ["c"; "use_char8"]
+        (S[A"-ccopt"; A"-DCHARSIZE=8"]);
+
+    flag ["c"; "use_char16"]
+        (S[A"-ccopt"; A"-DCHARSIZE=16"]);
+
+    flag ["c"; "use_char32"]
+        (S[A"-ccopt"; A"-DCHARSIZE=32"]);
+
+    dep ["link"; "ocaml"; "use_poy"]
+        ["libpoycside.a"];
+
+    dep ["ocaml"; "pp"; "use_extensions"]
+        ["poyExtension.cmo"; "kolmoExtension.cmo"];
+
+    dep ["ocaml"; "ocamldep"; "use_extensions"]
+        ["poyExtension.cmo"; "kolmoExtension.cmo"];
+
+    flag ["link"; "ocaml"; "byte"; "use_grappa"]
+        (S[A"-cclib"; A"-lgrappa"; A"-cclib"; A"-L."]);
+
+    flag ["link"; "ocaml"; "native"; "use_grappa"]
+        (S[A"-cclib"; A"-lgrappa"; A"-cclib"; A"-L."]);
+
+    dep ["link"; "ocaml"; "use_grappa"]
+        ["libgrappa.a"];
+
+    flag ["link"; "ocaml"; "use_camlp4o"]
+        (S[A"-I"; A"+camlp4"]);
+
+    flag ["link"; "ocaml"; "native"; "use_camlp4o"]
+        (A"camlp4o.cmxa");
+
+    flag ["link"; "ocaml"; "byte"; "use_camlp4o"]
+        (A"camlp4o.cma");
+
+    flag ["ocaml"; "compile"; "use_camlp4o"]
+        (S [(A"-I"); A"+camlp4"]);
+
+    flag ["link"; "ocaml"; "byte"; "use_gzcaml"]
+        (S [A"-dllib"; A"-lzlibstubs"; A"-cclib"; A"-lzlibstubs"; 
+             A"-dllib"; A"-lgzcaml"; A"-cclib"; A"-lgzcaml"]);
+
+    flag ["link"; "library"; "ocaml"; "native"; "use_gzcaml"]
+        (S [A"-cclib"; A"-lzlibstubs"; A"-cclib"; A"-lgzcaml"]);
+
+    flag ["c"; "compile"; "use_nativedynlink"]
+        (S [A"-ccopt"; A"-DUSE_NATIVEDYNLINK"]);
+
+    flag ["c"; "compile"; "use_xslt"]
+        (S[A"-ccopt"; A"-DUSE_XSLT"]);
+
+    flag ["c"; "compile"; "use_likelihood"]
+        (S[A"-ccopt"; A"-DUSE_LIKELIHOOD"]);
+
+    flag ["c"; "compile"; "use_concorde"]
+        (S[A"-ccopt"; A"-DUSE_CONCORDE"]);
+
+    flag ["link"; "use_concorde"]
+        (A concordelib); 
+
+    flag ["c"; "compile"; "use_readline"]
+        (S[A"-ccopt"; A"-DUSEREADLINE"]);
+
+    flag ["c"; "compile"; "use_ncurses"]
+        (S[A"-ccopt"; A"-DUSENCURSES"]);
+
+    flag ["c"; "compile"; "use_parallel"]
+        (S[A"-ccopt"; A"-DUSEPARALLEL"]);
+
+    flag ["link"; "ocaml"; "use_parallel"]
+        (S[A"-cclib"; A"-lmpicaml"]);
+
+    flag ["c"; "compile"; "use_nosharedhd"]
+        (S[A"-ccopt"; A"-DUSENOSHAREDHD"]);
+
+    flag ["c"; "compile"; "use_large_messages"]
+        (S[A"-ccopt"; A"-DUSE_LARGE_MESSAGES"]);
+
+    flag ["c"; "compile"; "use_long_sequences"]
+        (S[A"-ccopt"; A"-DUSE_LONG_SEQUENCES"]);
+
+    flag ["c"; "compile"; "use_large_alphabets"]
+        (S[A"-ccopt"; A"-DUSE_LARGE_ALPHABETS"]);
+
+    flag ["c"; "compile"; "use_verify_costs"]
+        (S[A"-ccopt"; A"-DUSE_VERIFY_COSTS"]);
+
+    flag ["c"; "compile"; "use_win32"]
+        (S[A"-ccopt"; A"-DUSEWIN32"]);
+
+    (* for GCC 4.5+ linker and ocamlbuild link order fix *)
+    if @CC_NOASNEEDED@ then
+        flag ["ocaml"; "link"]
+            (S [A"-cclib";A"-Wl,--no-as-needed"]);
+
+    if @USE_UNSAFE@ then begin
+        flag ["ocaml"; "compile"] (S [A"-unsafe"]);
+        flag ["ocaml"; "compile"] (S [A"-noassert"]);
+        flag ["ocaml"; "compile"; "native"]  (S [A"-inline";A"1000"]);
+        flag ["ocaml"; "compile"] (S [A"-ccopt";A"-DNDEBUG"]);
+        flag ["ocaml"; "compile"] (S [A"-ccopt";A"-finline-limit=1000"]);
+        flag [    "c"; "compile"] (S [A"-ccopt";A"-DNDEBUG"]);
+        flag [    "c"; "compile"] (S [A"-ccopt";A"-finline-limit=1000"]);
+    end;
+
+    flag ["shared"; "link"]
+        (S [A"-ccopt";A"-shared"]);
+
+    flag ["c"; "compile"]
+        (S ccompileflags);
+
+    flag ["c"; "link"]
+        (S clinkflags);
+
+    flag ["ocaml"; "compile"]
+        (S ccompileflags);
+
+    if @PROFILE_OCAML@ then begin
+        flag["ocaml"; "native"; "link"] (S [A"-p"]);
+        flag["ocaml"; "native"; "compile"] (S [A"-p"]);
+        flag["c";"compile"] (S [A"-ccopt";A"-pg"]);
+        flag["c";"link"] (S [A"-cclib";A"-pg"]);
+    end;
+
+    flag ["ocaml"; "link"]
+        (S clinkflags);
+
+    (*flag ["ocaml"; "compile"]
+         (S [A"-unsafe"]); *)
+
+    dep ["link"; "ocaml"; "use_gzcaml"]
+        ["libgzcaml.a"; "libzlibstubs.a"];
+
+    dep ["link"; "ocaml"; "use_parallel"]
+        ["libmpicaml.a"];
+
+    dep ["compile"; "c"]
+        headers;
+
+| _ -> ()
+
+end

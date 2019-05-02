@@ -1,0 +1,17 @@
+(*Maximum likelihood analysis: Dynamic*)
+
+read("9.fas")
+search(max_time:00:00:20)
+select()
+
+(*Transform parsimony DO characters to dyn MPL characters*)
+
+set(opt:coarse)
+transform(likelihood:(gtr,rates:gamma:(4),priors:estimate,gap:coupled,mpl))
+swap(spr,all:5)
+select(best:1)
+set(opt:exhaustive)
+report("9_dMPL.tre",trees:(branches),"9_dMPL_lkm.txt",lkmodel,"9_dMPL.ia",ia)
+transform(static_approx)
+report("9_sMPL.tre",trees:(branches),"9_sMPL_lkm.txt",lkmodel)
+exit()

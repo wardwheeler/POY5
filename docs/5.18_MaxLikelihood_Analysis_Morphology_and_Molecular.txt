@@ -1,0 +1,11 @@
+ (*Maximum Likelihood Analysis: Combined Data*) 
+
+read("morpho.ss")
+read(prealigned:("28s.aln"),tcm:(1,1))
+transform(likelihood:(ncm))
+read("18s.fas")
+transform((names:("18s.fas"),(likelihood:(tn93,rates:none,priors:estimate,gap:coupled,mpl))))
+search(max_time:00:01:00)
+swap(all,optimize:(model:never,branch:join_region))
+report("All_LK.tre",trees:(branches),"All_lkm.txt",lkmodel)
+exit()

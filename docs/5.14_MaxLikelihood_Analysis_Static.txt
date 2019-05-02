@@ -1,0 +1,16 @@
+(*Static ML analysis: Initial parsimony search*)
+
+read(prealigned:("9.fas",tcm:(1,1)))
+search(max_time:00:00:20)
+select()
+
+(*Transform static to LK characters. Heuristics follow*)
+
+set(opt:coarse)
+transform(likelihood:(gtr,rates:gamma:(4),priors:estimate,gap:missing,mal))
+swap(all:5,spr,optimize:(model:never,branch:never))
+fuse(optimize:(model:never,branch:join_region))
+select(best:1)
+set(opt:exhaustive)
+report("9_MAL.tre",trees:(branches),"9_MAL_lkm.txt",lkmodel)
+quit()

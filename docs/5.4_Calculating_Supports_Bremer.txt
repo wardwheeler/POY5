@@ -1,0 +1,19 @@
+(*Bremer support part 1: generating trees*)
+
+read("9.fas","31.ss")
+read(prealigned:(aminoacids:("41_aln.aa"),tcm:"s1t2.mat"))
+set(root:"t1")
+read("Run1c_H86.tre")
+swap(all,visited:"tmp.trees",timeout:3600)
+select()
+report("bremertrees.tre",trees)
+wipe()
+
+(*Bremer support part 2: Bremer calculations*)
+
+read("9.fas","31.ss")
+read(prealigned:(aminoacids:("41_aln.aa"),tcm:"s1t2.mat"))
+set(root:"t1")
+read("bremertrees.tre")
+report("Bremer_trees.pdf",graphsupports:bremer:"tmp.trees")
+exit()

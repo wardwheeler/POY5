@@ -1,0 +1,10 @@
+(*Maximum Likelihood Analysis: Morphology*)
+
+read("morpho.ss")
+transform(likelihood:(ncm))
+search()
+report("Morpho_ncm.tre",trees:(total))
+transform(range:("morpho.ss",0,99),(likelihood:(jc69,alphabet:min)))
+transform(range:("morpho.ss",100,173),(likelihood:(jc69,alphabet:5)))
+report("Morpho_jc69.tre",trees:(total,branches))
+exit()

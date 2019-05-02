@@ -1,0 +1,10 @@
+(*search using all data under ip*)
+
+read("9.fas","31.ss")
+read(prealigned:(aminoacids:("41_aln.aa"),tcm:"s1t2.mat"))
+read("Run1c_H86.tre")
+set(iterative:approximate:2)
+swap(around)
+select()
+report("all_trees.tre",trees:(total),"all_trees_cs.pdf",graphconsensus,"all_trees_diag.txt",diagnosis)
+exit()

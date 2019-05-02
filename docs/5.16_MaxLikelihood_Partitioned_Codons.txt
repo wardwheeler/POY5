@@ -1,0 +1,11 @@
+(*ML Analysis: Partitions and Model Selection*) 
+
+read(prealigned:("coleoptera_nd2.fasta",tcm:(1,1)))
+set(codon_partition:("coleop",names:("coleoptera_nd2.fasta")))
+build(100)
+swap()
+select(best:1)
+transform(likelihood:(aicc:"coleoptera_cp", rates:gamma:(4)))
+swap(spr,all:5,optimize:(model:threshold:1.33,branch:join_delta)
+report("codon_LK.tre",trees:(branches),"codon_LK_lkm.txt",lkmodel)
+exit()

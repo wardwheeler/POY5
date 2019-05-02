@@ -1,0 +1,11 @@
+(*Custom Alphabet Character Analysis*)
+
+read(custom_alphabet:("ca1.fas",tcm:("m1.mat")))
+transform(level:3)
+build(all,10)
+swap()
+fuse(iterations:5,replace:best,keep:5,swap())
+select()
+set(root:"One")
+report("CA1_trees.tre",trees:(total),"CA1_cs.pdf",graphconsensus)
+quit()

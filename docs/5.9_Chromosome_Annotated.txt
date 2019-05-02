@@ -1,0 +1,11 @@
+(*Chromosome analysis of annotated sequences*)
+
+read(annotated:("aninv2.fas"))
+transform(annotated:(locus_inversion:20,median_solver:caprara,locus_indel:(10,1.5),circular:false,median:1,swap_med:1))
+build(20)
+swap()
+select()
+report("ann_chrom_diag.txt",diagnosis)
+report("ann_chrom_diag.pdf",graphdiagnosis)
+report("ann_chrom_cs.pdf",graphconsensus)
+exit()

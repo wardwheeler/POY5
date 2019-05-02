@@ -1,0 +1,148 @@
+# $Id: Makefile 1929 2007-06-26 23:34:34Z andres $
+
+# Instructions:
+# You can compile a debug bytecode app by specifying DEBUG=-g
+# You can compile a profiled bytecode app by specifying
+#      OCAMLC=ocamlcp DEBUG="-p a"
+# You can compile a profiled native app by specifying PROFILE=-p
+
+# Change whatever options (compilers, compiler options, and so on) in this file
+# Cleanup spaces so that we recognize proper options
+
+SHELL = /bin/sh
+VPATH = @srcdir@
+
+subdirs = @subdirs@
+top_srcdir = @top_srcdir@
+srcdir = @srcdir@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+mandir = $(prefix)/man/man1
+
+CC = @CC@
+CPPFLAGS = @CPPFLAGS@
+CFLAGS = $(CPPFLAGS) @CFLAGS@ 
+LDFLAGS = @LDFLAGS@
+LIBS = -cclib "-lz @LIBS@"
+INSTALL = install
+
+USEPARALLEL := @USEPARALLEL@
+USE_LARGE_MESSAGES := @USE_LARGE_MESSAGES@
+USEWIN32 := @USEWIN32@
+USE_LONG_SEQUENCES := @USE_LONG_SEQUENCES@
+USE_LARGE_ALPHABETS := @USE_LARGE_ALPHABETS@
+USEINTERFACE := @USEINTERFACE@
+USEGRAPHICS := @USEGRAPHICS@
+USESHAREDHD := @USESHAREDHD@
+USE_XSLT := @USE_XSLT@
+USE_LIKELIHOOD := @USE_LIKELIHOOD@
+USE_VERIFY_COSTS := @USE_VERIFY_COSTS@
+OCAML := @OCAML@
+OCAMLC := @OCAMLC@
+OCAMLOPT := @OCAMLOPT@ 
+OCAMLDEP := @OCAMLDEP@ -slash
+OCAMLTOP := @OCAMLTOP@
+OCAMLLEX := @OCAMLLEX@
+OCAMLYACC := @OCAMLYACC@
+OCAMLBUILD := @OCAMLBUILD@
+EXTRAS := @EXTRAS@
+OFLAGS := @OCAMLFLAGS@ 
+NATIVEDYNLINK := @NATIVEDYNLINK@
+
+.PHONY: commands.pdf poy.native poy.byte poy.top clean distclean install doc all poy uninstall portal.native portal install_server docs install_docs install_doc
+
+##################################
+# Basic Compilation Entry Points
+#
+
+poy : poy.native 
+
+poy.top: 
+	$(OCAMLBUILD) $@
+
+poy.byte: 
+	$(OCAMLBUILD) $@
+
+poy.native: 
+	$(OCAMLBUILD) $@
+
+all: poy.byte poy.top VERSION poy.native
+
+##################################
+# Documentation through OCamlbuild
+
+commands.pdf:
+	$(OCAMLBUILD) $@
+	cp _build/commands.pdf ./commands.pdf
+
+doc: 
+	$(OCAMLBUILD) commands.pdf
+	cp _build/commands.pdf ./commands.pdf
+
+docs: doc
+
+##################################
+# Cleaning / Removing POY
+#
+
+install: poy.native
+	test -d $(prefix) || mkdir $(prefix)
+	test -d $(prefix)/bin || mkdir $(prefix)/bin
+	cp _build/poy.native _build/poy
+	$(INSTALL) -m 0755 _build/poy $(prefix)/bin
+
+install_doc: doc
+	$(INSTALL) -m 0644 _build/poy.1 $(mandir)
+
+
+install_docs: install_doc
+
+uninstall:
+	rm -f $(prefix)/bin/poy
+	rm -f $(mandir)/poy.1
+
+clean:
+	rm -f *.native *.byte *.top
+	rm -rf _build
+	$(OCAMLBUILD) -clean
+
+distclean: clean
+	rm -f buildNumber.ml compileFlags.ml config.h \
+		config.log config.status _tags myocamlbuild.ml \
+		poy.native poy.byte poy.d.byte poy.top
+	rm -f Makefile
+
+
+##################################
+# Commands for the portal / server
+#
+
+portal.native: poy.native xml/swami.xml 
+	$(OCAMLBUILD) portal.native
+
+portal : portal.native
+
+xml/swami.xml:
+	$(OCAMLBUILD) makeVersion.native
+	export RESULT="`makeVersion.native -text`"; sed "s/VERSION/$${RESULT}/g" ../xml/swami.xml.in > ../xml/swami.xml
+
+install_portal: install portal.native
+	$(INSTALL) _build/portal.native $(prefix)/bin/
+
+
+##################################
+# Commands for testing
+#
+
+poy_test.byte: 
+	$(OCAMLBUILD) $@
+
+poy_test.native:
+	$(OCAMLBUILD) poy_test.native
+	cp ./_build/poy_test.native ../test/poy_test.native
+
+VERSION:
+	$(OCAMLBUILD) makeVersion.native
+	export RESULT="`makeVersion.native -text`"; echo "POY $${RESULT}" > VERSION
+	$(OCAMLBUILD) poy.native
+
