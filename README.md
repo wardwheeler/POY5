@@ -18,7 +18,7 @@ sudo apt-get install mpi (if you want parallel execution via MPI)
 sudo apt-get install zlib1gcd -dev
 
 
-To compile with OCCaml 4.01.0:
+To compile with OCaml 4.01.0:
 
 install POY package in PATH
 navigate to PATH/src
