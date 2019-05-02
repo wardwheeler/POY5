@@ -17,9 +17,12 @@ sudo apt-get install gfortran
 sudo apt-get install mpi (if you want parallel execution via MPI)
 sudo apt-get install zlib1gcd -dev
 
-install POY package in PATH
 
 To compile with OCCaml 4.01.0:
+
+install POY package in PATH
+navigate to PATH/src
+make clean
 
 ./configure --enable-large-alphabets --enable-long-sequences --enable-unsafe --enable-likelihood --enable-interface=flat
 
